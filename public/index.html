@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FinLedger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
+<style>
+/* ── Reset & variables ─────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0b0f19;
+  --surface:   #111827;
+  --border:    #1e2a3a;
+  --muted:     #374151;
+  --text:      #e2e8f0;
+  --subtle:    #64748b;
+  --accent:    #f59e0b;
+  --accent-dim:#92400e;
+  --green:     #10b981;
+  --red:       #ef4444;
+  --blue:      #3b82f6;
+  --font-ui:   'Syne', sans-serif;
+  --font-data: 'IBM Plex Mono', monospace;
+  --radius:    6px;
+  --shadow:    0 4px 24px rgba(0,0,0,.4);
+}
+
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-ui); font-size: 14px; line-height: 1.5; }
+
+/* ── Scrollbar ─────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: var(--bg); } ::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 3px; }
+
+/* ── Utility ───────────────────────────────────────────────────────────── */
+.hidden { display: none !important; }
+.mono   { font-family: var(--font-data); }
+.income { color: var(--green); }
+.expense{ color: var(--red); }
+.badge  { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; font-family: var(--font-data); text-transform: uppercase; letter-spacing: .04em; }
+.badge-viewer  { background: #1e3a5f; color: #60a5fa; }
+.badge-analyst { background: #312e81; color: #a78bfa; }
+.badge-admin   { background: #7f1d1d; color: #fca5a5; }
+.badge-income  { background: #064e3b; color: #34d399; }
+.badge-expense { background: #450a0a; color: #f87171; }
+.badge-active  { background: #064e3b; color: #34d399; }
+.badge-inactive{ background: #374151; color: #9ca3af; }
+
+/* ── Login ─────────────────────────────────────────────────────────────── */
+#login-screen {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(ellipse 80% 60% at 50% 0%, #1c1a0e 0%, var(--bg) 70%);
+}
+.login-card {
+  width: 100%; max-width: 400px; padding: 48px 40px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; box-shadow: var(--shadow);
+  animation: slideUp .4s ease;
+}
+@keyframes slideUp { from { opacity:0; transform: translateY(16px); } to { opacity:1; transform: translateY(0); } }
+
+.login-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 32px; }
+.login-logo svg { flex-shrink: 0; }
+.login-logo-text { font-size: 22px; font-weight: 800; letter-spacing: -.02em; color: var(--accent); }
+.login-logo-text span { color: var(--text); }
+
+.login-card h2 { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+.login-card p  { color: var(--subtle); font-size: 13px; margin-bottom: 28px; }
+
+.field { margin-bottom: 18px; }
+.field label { display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--subtle); margin-bottom: 7px; }
+.field input  { width: 100%; padding: 10px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-family: var(--font-data); font-size: 13px; outline: none; transition: border-color .15s; }
+.field input:focus { border-color: var(--accent); }
+
+.btn { width: 100%; padding: 11px; background: var(--accent); color: #000; border: none; border-radius: var(--radius); font-family: var(--font-ui); font-size: 14px; font-weight: 700; cursor: pointer; transition: opacity .15s, transform .1s; }
+.btn:hover { opacity: .88; } .btn:active { transform: scale(.98); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+.btn-ghost:hover { background: var(--border); opacity: 1; }
+.btn-sm { width: auto; padding: 6px 14px; font-size: 12px; }
+.btn-danger { background: var(--red); color: #fff; }
+
+.login-hint { margin-top: 20px; padding: 14px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); font-family: var(--font-data); font-size: 11px; color: var(--subtle); line-height: 1.8; }
+.login-hint strong { color: var(--accent); display: block; margin-bottom: 4px; font-family: var(--font-ui); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+
+.error-msg { background: #450a0a; border: 1px solid #7f1d1d; color: #fca5a5; padding: 10px 14px; border-radius: var(--radius); font-size: 13px; margin-bottom: 16px; }
+
+/* ── App Shell ─────────────────────────────────────────────────────────── */
+#app { display: none; height: 100vh; display: grid; grid-template-columns: 220px 1fr; grid-template-rows: auto 1fr; }
+#app.visible { display: grid; }
+
+/* ── Top bar ───────────────────────────────────────────────────────────── */
+.topbar {
+  grid-column: 1 / -1; height: 52px;
+  display: flex; align-items: center; padding: 0 20px;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  gap: 16px;
+}
+.topbar-logo { font-size: 16px; font-weight: 800; color: var(--accent); letter-spacing: -.02em; margin-right: auto; }
+.topbar-logo span { color: var(--text); }
+.topbar-user { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--subtle); }
+.topbar-user strong { color: var(--text); }
+.topbar-logout { padding: 5px 12px; background: transparent; border: 1px solid var(--border); border-radius: var(--radius); color: var(--subtle); font-size: 12px; cursor: pointer; font-family: var(--font-ui); transition: all .15s; }
+.topbar-logout:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Sidebar ───────────────────────────────────────────────────────────── */
+.sidebar { background: var(--surface); border-right: 1px solid var(--border); padding: 16px 0; display: flex; flex-direction: column; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 20px; font-size: 13px; font-weight: 600; color: var(--subtle); cursor: pointer; transition: all .15s; border-left: 2px solid transparent; }
+.nav-item:hover  { color: var(--text); background: rgba(255,255,255,.03); }
+.nav-item.active { color: var(--accent); border-left-color: var(--accent); background: rgba(245,158,11,.06); }
+.nav-item svg    { flex-shrink: 0; opacity: .7; }
+.nav-item.active svg { opacity: 1; }
+.nav-divider { height: 1px; background: var(--border); margin: 8px 16px; }
+
+/* ── Main content ──────────────────────────────────────────────────────── */
+.main { overflow-y: auto; padding: 28px; display: flex; flex-direction: column; gap: 24px; }
+.page { display: none; flex-direction: column; gap: 24px; }
+.page.active { display: flex; }
+
+/* ── Page header ───────────────────────────────────────────────────────── */
+.page-header { display: flex; align-items: center; justify-content: space-between; }
+.page-title { font-size: 22px; font-weight: 800; }
+.page-subtitle { font-size: 13px; color: var(--subtle); margin-top: 2px; }
+
+/* ── KPI cards ─────────────────────────────────────────────────────────── */
+.kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; animation: fadeIn .3s ease; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.kpi-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--subtle); margin-bottom: 10px; }
+.kpi-value { font-family: var(--font-data); font-size: 26px; font-weight: 600; line-height: 1; }
+.kpi-value.income  { color: var(--green); }
+.kpi-value.expense { color: var(--red); }
+.kpi-value.net     { color: var(--accent); }
+.kpi-sub   { font-family: var(--font-data); font-size: 11px; color: var(--subtle); margin-top: 6px; }
+
+/* ── Card ──────────────────────────────────────────────────────────────── */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.card-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.card-title  { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--subtle); }
+.card-body   { padding: 20px; }
+
+/* ── Trend chart ───────────────────────────────────────────────────────── */
+.trend-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.chart-wrap { position: relative; height: 160px; }
+canvas { width: 100% !important; height: 100% !important; }
+
+/* ── Table ─────────────────────────────────────────────────────────────── */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--subtle); border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 11px 14px; border-bottom: 1px solid rgba(255,255,255,.04); font-family: var(--font-data); font-size: 12px; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(255,255,255,.02); }
+.td-name { font-family: var(--font-ui); font-size: 13px; font-weight: 600; }
+.td-notes { color: var(--subtle); font-size: 11px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.amount-cell { font-weight: 600; }
+
+/* ── Filters ───────────────────────────────────────────────────────────── */
+.filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.filter-select, .filter-input {
+  padding: 7px 12px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); color: var(--text); font-family: var(--font-data);
+  font-size: 12px; outline: none; cursor: pointer; transition: border-color .15s;
+}
+.filter-select:focus, .filter-input:focus { border-color: var(--accent); }
+.filter-input { cursor: text; }
+
+/* ── Pagination ────────────────────────────────────────────────────────── */
+.pagination { display: flex; align-items: center; gap: 8px; font-family: var(--font-data); font-size: 12px; color: var(--subtle); }
+.page-btn { padding: 5px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); cursor: pointer; font-family: var(--font-data); font-size: 12px; transition: all .15s; }
+.page-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.page-btn:disabled { opacity: .3; cursor: default; }
+
+/* ── Modal ─────────────────────────────────────────────────────────────── */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.7); display: flex; align-items: center; justify-content: center; z-index: 100; animation: fadeIn .15s ease; }
+.modal { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; width: 460px; max-width: 96vw; box-shadow: var(--shadow); }
+.modal-header { padding: 20px 24px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.modal-title  { font-size: 16px; font-weight: 700; }
+.modal-close  { background: none; border: none; color: var(--subtle); cursor: pointer; font-size: 18px; line-height: 1; padding: 2px 6px; border-radius: 4px; transition: color .15s; }
+.modal-close:hover { color: var(--text); }
+.modal-body   { padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
+.modal-footer { padding: 14px 24px 20px; display: flex; gap: 10px; justify-content: flex-end; }
+
+/* ── Category bar ──────────────────────────────────────────────────────── */
+.cat-list { display: flex; flex-direction: column; gap: 10px; }
+.cat-row  { display: flex; align-items: center; gap: 10px; }
+.cat-label{ font-size: 12px; color: var(--subtle); min-width: 110px; font-family: var(--font-data); }
+.cat-bar  { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.cat-fill { height: 100%; border-radius: 3px; background: var(--accent); transition: width .6s ease; }
+.cat-fill.income-fill  { background: var(--green); }
+.cat-fill.expense-fill { background: var(--accent); }
+.cat-total{ font-family: var(--font-data); font-size: 12px; font-weight: 600; min-width: 80px; text-align: right; }
+
+/* ── Empty state ───────────────────────────────────────────────────────── */
+.empty { text-align: center; padding: 40px 20px; color: var(--subtle); }
+.empty svg { margin-bottom: 12px; opacity: .3; }
+.empty p { font-size: 13px; }
+
+/* ── Loading spinner ───────────────────────────────────────────────────── */
+.spinner { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .6s linear infinite; margin: 40px auto; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Recent activity ───────────────────────────────────────────────────── */
+.activity-list { display: flex; flex-direction: column; gap: 0; }
+.activity-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.04); }
+.activity-row:last-child { border-bottom: none; }
+.activity-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.activity-dot.income  { background: var(--green); }
+.activity-dot.expense { background: var(--red); }
+.activity-info { flex: 1; min-width: 0; }
+.activity-cat  { font-size: 12px; font-weight: 600; text-transform: capitalize; }
+.activity-note { font-size: 11px; color: var(--subtle); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.activity-right{ text-align: right; flex-shrink: 0; }
+.activity-amt  { font-family: var(--font-data); font-size: 13px; font-weight: 600; }
+.activity-date { font-family: var(--font-data); font-size: 11px; color: var(--subtle); }
+
+/* ── Toast ─────────────────────────────────────────────────────────────── */
+#toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 18px; font-size: 13px; box-shadow: var(--shadow); z-index: 200; transition: opacity .2s; pointer-events: none; }
+#toast.show { opacity: 1; } #toast.hide { opacity: 0; }
+#toast.success { border-color: var(--green); color: var(--green); }
+#toast.error   { border-color: var(--red);   color: var(--red);   }
+
+/* ── Responsive ────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .trend-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  #app.visible { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+  .kpi-grid { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── Login ─────────────────────────────────────────────────────────────── -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+        <rect width="28" height="28" rx="6" fill="#f59e0b" fill-opacity=".15"/>
+        <path d="M7 14h14M14 7v14" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="14" cy="14" r="4" stroke="#f59e0b" stroke-width="1.5"/>
+      </svg>
+      <div class="login-logo-text">Fin<span>Ledger</span></div>
+    </div>
+    <h2>Welcome back</h2>
+    <p>Sign in to access your finance dashboard</p>
+    <div id="login-error" class="error-msg hidden"></div>
+    <div class="field"><label>Email</label><input type="email" id="login-email" placeholder="admin@finledger.dev" /></div>
+    <div class="field"><label>Password</label><input type="password" id="login-password" placeholder="••••••••" /></div>
+    <button class="btn" id="login-btn">Sign in</button>
+    <div class="login-hint">
+      <strong>Demo credentials</strong>
+      admin@finledger.dev · Admin1234<br>
+      analyst@finledger.dev · Analyst1234<br>
+      viewer@finledger.dev · Viewer1234
+    </div>
+  </div>
+</div>
+
+<!-- ── App ───────────────────────────────────────────────────────────────── -->
+<div id="app">
+  <!-- Topbar -->
+  <header class="topbar">
+    <div class="topbar-logo">Fin<span>Ledger</span></div>
+    <div class="topbar-user">
+      <span id="topbar-name"></span>
+      <span id="topbar-badge"></span>
+    </div>
+    <button class="topbar-logout" id="logout-btn">Sign out</button>
+  </header>
+
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="nav-item active" data-page="dashboard">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="1" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="1" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>
+      Dashboard
+    </div>
+    <div class="nav-item nav-analyst" data-page="transactions">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h8M2 12h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      Transactions
+    </div>
+    <div class="nav-divider nav-admin"></div>
+    <div class="nav-item nav-admin" data-page="users">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M2 14c0-3.314 2.686-5 6-5s6 1.686 6 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      Users
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <main class="main">
+
+    <!-- Dashboard page -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <div><div class="page-title">Dashboard</div><div class="page-subtitle">Financial overview</div></div>
+      </div>
+      <div class="kpi-grid" id="kpi-grid"><div class="spinner"></div></div>
+      <div class="trend-grid">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Monthly Trend</span></div>
+          <div class="card-body"><div class="chart-wrap"><canvas id="monthly-chart"></canvas></div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Top Spending</span></div>
+          <div class="card-body"><div id="cat-list" class="cat-list"><div class="spinner"></div></div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Recent Activity</span></div>
+        <div class="card-body"><div id="activity-list" class="activity-list"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+
+    <!-- Transactions page -->
+    <div class="page" id="page-transactions">
+      <div class="page-header">
+        <div><div class="page-title">Transactions</div><div class="page-subtitle">All financial records</div></div>
+        <button class="btn btn-sm nav-admin-btn" id="new-tx-btn" style="width:auto;padding:8px 16px;font-size:13px;">+ New</button>
+      </div>
+      <div class="filters">
+        <select class="filter-select" id="tx-filter-type"><option value="">All types</option><option value="income">Income</option><option value="expense">Expense</option></select>
+        <select class="filter-select" id="tx-filter-cat"><option value="">All categories</option></select>
+        <input class="filter-input" id="tx-search" placeholder="Search…" style="min-width:160px;" />
+        <input class="filter-input" id="tx-date-from" type="date" title="From date" />
+        <input class="filter-input" id="tx-date-to"   type="date" title="To date"   />
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Amount</th><th>Notes</th><th class="nav-admin-th">Actions</th></tr></thead>
+            <tbody id="tx-tbody"><tr><td colspan="6"><div class="spinner"></div></td></tr></tbody>
+          </table>
+        </div>
+        <div style="padding:14px 16px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+          <span class="pagination" id="tx-info"></span>
+          <div class="pagination">
+            <button class="page-btn" id="tx-prev">←</button>
+            <span id="tx-page-label"></span>
+            <button class="page-btn" id="tx-next">→</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Users page -->
+    <div class="page" id="page-users">
+      <div class="page-header">
+        <div><div class="page-title">Users</div><div class="page-subtitle">Account management</div></div>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
+            <tbody id="users-tbody"><tr><td colspan="6"><div class="spinner"></div></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ── New / Edit Transaction Modal ──────────────────────────────────────── -->
+<div id="tx-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="tx-modal-title">New Transaction</span>
+      <button class="modal-close" onclick="closeTxModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="tx-modal-error" class="error-msg hidden"></div>
+      <div class="field"><label>Type</label>
+        <select class="filter-select" id="m-type" style="width:100%;">
+          <option value="income">Income</option><option value="expense">Expense</option>
+        </select>
+      </div>
+      <div class="field"><label>Category</label>
+        <select class="filter-select" id="m-category" style="width:100%;"></select>
+      </div>
+      <div class="field"><label>Amount</label><input type="number" class="filter-input" id="m-amount" placeholder="0.00" min="0.01" step="0.01" style="width:100%;" /></div>
+      <div class="field"><label>Date</label><input type="date" class="filter-input" id="m-date" style="width:100%;" /></div>
+      <div class="field"><label>Notes</label><input type="text" class="filter-input" id="m-notes" placeholder="Optional description…" style="width:100%;" /></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeTxModal()">Cancel</button>
+      <button class="btn btn-sm" id="tx-modal-save" style="width:auto;padding:8px 20px;">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast ──────────────────────────────────────────────────────────────── -->
+<div id="toast" class="hide"></div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   CONFIG
+══════════════════════════════════════════════════════════════════════════ */
+const API = 'http://localhost:3000/api';
+
+const INCOME_CATS  = ['salary','freelance','investment','rental','other_income'];
+const EXPENSE_CATS = ['food','housing','transport','utilities','healthcare','entertainment','education','shopping','travel','other_expense'];
+const ALL_CATS = [...INCOME_CATS, ...EXPENSE_CATS];
+
+/* ══════════════════════════════════════════════════════════════════════════
+   STATE
+══════════════════════════════════════════════════════════════════════════ */
+let token = localStorage.getItem('fl_token') || null;
+let user  = JSON.parse(localStorage.getItem('fl_user') || 'null');
+let txPage = 1, txTotal = 0, txFilters = {};
+let editingTxId = null;
+let monthlyChartInstance = null;
+
+/* ══════════════════════════════════════════════════════════════════════════
+   HELPERS
+══════════════════════════════════════════════════════════════════════════ */
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(n);
+const fmtDate = (s) => s ? s.slice(0, 10) : '—';
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, ' ');
+const isAdmin   = () => user && user.role === 'admin';
+const isAnalyst = () => user && (user.role === 'analyst' || user.role === 'admin');
+
+function toast(msg, type = 'success') {
+  const t = $('toast');
+  t.textContent = msg; t.className = `show ${type}`;
+  clearTimeout(t._t); t._t = setTimeout(() => t.className = 'hide', 2800);
+}
+
+async function api(path, opts = {}) {
+  const res = await fetch(API + path, {
+    ...opts,
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...opts.headers },
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.message || 'Request failed');
+  return json.data;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   AUTH
+══════════════════════════════════════════════════════════════════════════ */
+async function login() {
+  const email = $('login-email').value.trim();
+  const pass  = $('login-password').value;
+  const err   = $('login-error');
+  const btn   = $('login-btn');
+  err.classList.add('hidden');
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  try {
+    const data = await api('/auth/login', { method: 'POST', body: { email, password: pass } });
+    token = data.token; user = data.user;
+    localStorage.setItem('fl_token', token);
+    localStorage.setItem('fl_user', JSON.stringify(user));
+    showApp();
+  } catch (e) {
+    err.textContent = e.message; err.classList.remove('hidden');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Sign in';
+  }
+}
+
+function logout() {
+  token = null; user = null;
+  localStorage.removeItem('fl_token'); localStorage.removeItem('fl_user');
+  $('app').classList.remove('visible');
+  $('login-screen').style.display = 'flex';
+  monthlyChartInstance = null;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   BOOT / LAYOUT
+══════════════════════════════════════════════════════════════════════════ */
+function showApp() {
+  $('login-screen').style.display = 'none';
+  $('app').classList.add('visible');
+  $('topbar-name').textContent = user.name;
+  $('topbar-badge').innerHTML = `<span class="badge badge-${user.role}">${user.role}</span>`;
+
+  // Role-based nav visibility
+  document.querySelectorAll('.nav-analyst').forEach(el => el.classList.toggle('hidden', !isAnalyst()));
+  document.querySelectorAll('.nav-admin').forEach(el =>   el.classList.toggle('hidden', !isAdmin()));
+  document.querySelectorAll('.nav-admin-btn').forEach(el => el.classList.toggle('hidden', !isAdmin()));
+  document.querySelectorAll('.nav-admin-th').forEach(el =>  el.classList.toggle('hidden', !isAdmin()));
+
+  // Populate category dropdowns
+  const catFilter = $('tx-filter-cat');
+  catFilter.innerHTML = '<option value="">All categories</option>';
+  ALL_CATS.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = cap(c); catFilter.appendChild(o); });
+
+  navigateTo('dashboard');
+}
+
+function navigateTo(page) {
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.page === page));
+  document.querySelectorAll('.page').forEach(el => el.classList.toggle('active', el.id === `page-${page}`));
+  if (page === 'dashboard')    loadDashboard();
+  if (page === 'transactions') { txPage = 1; loadTransactions(); }
+  if (page === 'users')        loadUsers();
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DASHBOARD
+══════════════════════════════════════════════════════════════════════════ */
+async function loadDashboard() {
+  try {
+    const d = await api('/dashboard');
+    renderKPIs(d.summary);
+    renderMonthly(d.monthly_trend);
+    renderTopSpending(d.top_spending);
+    renderActivity(d.recent_activity);
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+function renderKPIs(s) {
+  $('kpi-grid').innerHTML = `
+    <div class="kpi-card"><div class="kpi-label">Total Income</div><div class="kpi-value income">₹${fmt(s.total_income)}</div><div class="kpi-sub">all time</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total Expenses</div><div class="kpi-value expense">₹${fmt(s.total_expenses)}</div><div class="kpi-sub">all time</div></div>
+    <div class="kpi-card"><div class="kpi-label">Net Balance</div><div class="kpi-value net ${s.net_balance < 0 ? 'expense' : ''}">₹${fmt(s.net_balance)}</div><div class="kpi-sub">${s.net_balance >= 0 ? 'surplus' : 'deficit'}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Transactions</div><div class="kpi-value">${s.transaction_count}</div><div class="kpi-sub">total records</div></div>
+  `;
+}
+
+function renderMonthly(rows) {
+  const canvas = $('monthly-chart');
+  const ctx = canvas.getContext('2d');
+  if (monthlyChartInstance) { monthlyChartInstance.destroy(); monthlyChartInstance = null; }
+
+  const labels   = rows.map(r => r.month.slice(5));  // "MM"
+  const incomes  = rows.map(r => r.income);
+  const expenses = rows.map(r => r.expenses);
+
+  // Simple canvas bar chart — no external library needed
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.offsetWidth  || 400;
+  const H = canvas.offsetHeight || 160;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  ctx.scale(dpr, dpr);
+
+  const padL = 10, padR = 10, padT = 10, padB = 28;
+  const chartW = W - padL - padR;
+  const chartH = H - padT - padB;
+  const maxVal = Math.max(...incomes, ...expenses, 1);
+  const n = rows.length;
+  const groupW = chartW / n;
+  const barW = Math.max(2, groupW * 0.28);
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Grid lines
+  ctx.strokeStyle = '#1e2a3a'; ctx.lineWidth = 1;
+  for (let i = 0; i <= 3; i++) {
+    const y = padT + chartH - (chartH * i / 3);
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
+  }
+
+  rows.forEach((r, i) => {
+    const x = padL + i * groupW + groupW / 2;
+
+    const iH = (r.income  / maxVal) * chartH;
+    const eH = (r.expenses / maxVal) * chartH;
+
+    ctx.fillStyle = '#10b981';
+    ctx.fillRect(x - barW - 1, padT + chartH - iH, barW, iH);
+
+    ctx.fillStyle = '#f59e0b';
+    ctx.fillRect(x + 1, padT + chartH - eH, barW, eH);
+
+    ctx.fillStyle = '#475569'; ctx.font = `${10 * dpr / dpr}px IBM Plex Mono`;
+    ctx.textAlign = 'center';
+    ctx.fillText(r.month.slice(5), x, H - 8);
+  });
+
+  // Legend
+  const lx = W - padR - 110;
+  ctx.fillStyle = '#10b981'; ctx.fillRect(lx, padT, 8, 8);
+  ctx.fillStyle = '#94a3b8'; ctx.font = '10px IBM Plex Mono'; ctx.textAlign = 'left';
+  ctx.fillText('Income', lx + 11, padT + 8);
+  ctx.fillStyle = '#f59e0b'; ctx.fillRect(lx + 60, padT, 8, 8);
+  ctx.fillStyle = '#94a3b8'; ctx.fillText('Expense', lx + 71, padT + 8);
+
+  // Store dummy ref so we can track state
+  monthlyChartInstance = { destroy: () => {} };
+}
+
+function renderTopSpending(rows) {
+  if (!rows.length) { $('cat-list').innerHTML = '<div class="empty"><p>No expense data</p></div>'; return; }
+  const max = rows[0].total;
+  $('cat-list').innerHTML = rows.slice(0, 6).map(r => `
+    <div class="cat-row">
+      <span class="cat-label">${cap(r.category)}</span>
+      <div class="cat-bar"><div class="cat-fill expense-fill" style="width:${(r.total/max*100).toFixed(1)}%"></div></div>
+      <span class="cat-total expense">₹${fmt(r.total)}</span>
+    </div>`).join('');
+}
+
+function renderActivity(rows) {
+  if (!rows.length) { $('activity-list').innerHTML = '<div class="empty"><p>No recent activity</p></div>'; return; }
+  $('activity-list').innerHTML = rows.map(r => `
+    <div class="activity-row">
+      <div class="activity-dot ${r.type}"></div>
+      <div class="activity-info">
+        <div class="activity-cat">${cap(r.category)}</div>
+        <div class="activity-note">${r.notes || '—'}</div>
+      </div>
+      <div class="activity-right">
+        <div class="activity-amt ${r.type}">${r.type === 'income' ? '+' : '-'}₹${fmt(r.amount)}</div>
+        <div class="activity-date">${fmtDate(r.date)}</div>
+      </div>
+    </div>`).join('');
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   TRANSACTIONS
+══════════════════════════════════════════════════════════════════════════ */
+async function loadTransactions() {
+  const params = new URLSearchParams({ page: txPage, limit: 20 });
+  const type = $('tx-filter-type').value;
+  const cat  = $('tx-filter-cat').value;
+  const q    = $('tx-search').value.trim();
+  const df   = $('tx-date-from').value;
+  const dt   = $('tx-date-to').value;
+  if (type) params.set('type', type);
+  if (cat)  params.set('category', cat);
+  if (q)    params.set('search', q);
+  if (df)   params.set('dateFrom', df);
+  if (dt)   params.set('dateTo', dt);
+
+  $('tx-tbody').innerHTML = '<tr><td colspan="6"><div class="spinner"></div></td></tr>';
+  try {
+    const d = await api(`/transactions?${params}`);
+    txTotal = d.total;
+    renderTxRows(d.transactions);
+    $('tx-info').textContent = `${d.total} record${d.total !== 1 ? 's' : ''}`;
+    $('tx-page-label').textContent = `${txPage} / ${Math.max(1, Math.ceil(d.total / 20))}`;
+    $('tx-prev').disabled = txPage <= 1;
+    $('tx-next').disabled = txPage >= Math.ceil(d.total / 20);
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+function renderTxRows(rows) {
+  if (!rows.length) {
+    $('tx-tbody').innerHTML = '<tr><td colspan="6"><div class="empty"><p>No transactions found</p></div></td></tr>';
+    return;
+  }
+  $('tx-tbody').innerHTML = rows.map(r => `
+    <tr>
+      <td class="mono">${fmtDate(r.date)}</td>
+      <td><span class="badge badge-${r.type}">${r.type}</span></td>
+      <td class="td-name">${cap(r.category)}</td>
+      <td class="amount-cell ${r.type}">₹${fmt(r.amount)}</td>
+      <td class="td-notes">${r.notes || '—'}</td>
+      ${isAdmin() ? `<td style="white-space:nowrap;"><button class="page-btn" onclick="openEditTx('${r.id}','${r.type}','${r.category}',${r.amount},'${r.date}','${(r.notes||'').replace(/'/g,"\\'")}')">Edit</button> <button class="page-btn" style="color:var(--red);border-color:var(--red);" onclick="deleteTx('${r.id}')">Del</button></td>` : '<td></td>'}
+    </tr>`).join('');
+}
+
+async function deleteTx(id) {
+  if (!confirm('Delete this transaction? It will be soft-deleted and hidden from all views.')) return;
+  try {
+    await api(`/transactions/${id}`, { method: 'DELETE' });
+    toast('Transaction deleted'); loadTransactions();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   TX MODAL
+══════════════════════════════════════════════════════════════════════════ */
+function buildCatOptions(type) {
+  const cats = type === 'income' ? INCOME_CATS : EXPENSE_CATS;
+  $('m-category').innerHTML = cats.map(c => `<option value="${c}">${cap(c)}</option>`).join('');
+}
+
+function openNewTx() {
+  editingTxId = null;
+  $('tx-modal-title').textContent = 'New Transaction';
+  $('tx-modal-error').classList.add('hidden');
+  $('m-type').value = 'income'; buildCatOptions('income');
+  $('m-amount').value = ''; $('m-date').value = new Date().toISOString().slice(0,10); $('m-notes').value = '';
+  $('tx-modal').classList.remove('hidden');
+}
+
+function openEditTx(id, type, category, amount, date, notes) {
+  editingTxId = id;
+  $('tx-modal-title').textContent = 'Edit Transaction';
+  $('tx-modal-error').classList.add('hidden');
+  $('m-type').value = type; buildCatOptions(type);
+  $('m-category').value = category;
+  $('m-amount').value = amount; $('m-date').value = date; $('m-notes').value = notes;
+  $('tx-modal').classList.remove('hidden');
+}
+
+function closeTxModal() { $('tx-modal').classList.add('hidden'); }
+
+async function saveTx() {
+  const body = {
+    type:     $('m-type').value,
+    category: $('m-category').value,
+    amount:   parseFloat($('m-amount').value),
+    date:     $('m-date').value,
+    notes:    $('m-notes').value.trim() || undefined,
+  };
+  const errEl = $('tx-modal-error');
+  errEl.classList.add('hidden');
+  if (!body.amount || body.amount <= 0) { errEl.textContent = 'Amount must be a positive number.'; errEl.classList.remove('hidden'); return; }
+  try {
+    if (editingTxId) { await api(`/transactions/${editingTxId}`, { method: 'PATCH', body }); toast('Transaction updated'); }
+    else             { await api('/transactions', { method: 'POST', body }); toast('Transaction created'); }
+    closeTxModal(); loadTransactions();
+  } catch (e) { errEl.textContent = e.message; errEl.classList.remove('hidden'); }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   USERS
+══════════════════════════════════════════════════════════════════════════ */
+async function loadUsers() {
+  $('users-tbody').innerHTML = '<tr><td colspan="6"><div class="spinner"></div></td></tr>';
+  try {
+    const d = await api('/users?limit=100');
+    if (!d.users.length) { $('users-tbody').innerHTML = '<tr><td colspan="6"><div class="empty"><p>No users found</p></div></td></tr>'; return; }
+    $('users-tbody').innerHTML = d.users.map(u => `
+      <tr>
+        <td class="td-name">${u.name}</td>
+        <td class="mono" style="font-size:11px;">${u.email}</td>
+        <td><span class="badge badge-${u.role}">${u.role}</span></td>
+        <td><span class="badge badge-${u.status}">${u.status}</span></td>
+        <td class="mono" style="font-size:11px;">${fmtDate(u.created_at)}</td>
+        <td>${u.id !== user.id ? `<button class="page-btn" onclick="toggleStatus('${u.id}','${u.status}')">${u.status === 'active' ? 'Deactivate' : 'Activate'}</button>` : '<span style="color:var(--subtle);font-size:11px;">you</span>'}</td>
+      </tr>`).join('');
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function toggleStatus(id, current) {
+  const next = current === 'active' ? 'inactive' : 'active';
+  if (next === 'inactive' && !confirm('Deactivate this account?')) return;
+  try {
+    await api(`/users/${id}/status`, { method: 'PATCH', body: { status: next } });
+    toast(`User ${next}`); loadUsers();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   EVENT WIRING
+══════════════════════════════════════════════════════════════════════════ */
+$('login-btn').addEventListener('click', login);
+['login-email','login-password'].forEach(id => $(id).addEventListener('keydown', e => { if (e.key === 'Enter') login(); }));
+$('logout-btn').addEventListener('click', logout);
+
+document.querySelectorAll('.nav-item').forEach(el => {
+  el.addEventListener('click', () => navigateTo(el.dataset.page));
+});
+
+$('new-tx-btn').addEventListener('click', openNewTx);
+$('tx-modal-save').addEventListener('click', saveTx);
+$('tx-modal').addEventListener('click', e => { if (e.target === $('tx-modal')) closeTxModal(); });
+$('m-type').addEventListener('change', e => buildCatOptions(e.target.value));
+
+['tx-filter-type','tx-filter-cat','tx-date-from','tx-date-to'].forEach(id => $(id).addEventListener('change', () => { txPage = 1; loadTransactions(); }));
+let searchTimer;
+$('tx-search').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { txPage = 1; loadTransactions(); }, 350); });
+
+$('tx-prev').addEventListener('click', () => { if (txPage > 1) { txPage--; loadTransactions(); } });
+$('tx-next').addEventListener('click', () => { txPage++; loadTransactions(); });
+
+/* ══════════════════════════════════════════════════════════════════════════
+   INIT
+══════════════════════════════════════════════════════════════════════════ */
+if (token && user) showApp();
+</script>
+</body>
+</html>
