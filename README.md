@@ -1,15 +1,3 @@
-# FinLedger API
-
-![Node.js](https://img.shields.io/badge/Node.js-22%2B-339933?logo=node.js&logoColor=white)
-![Express](https://img.shields.io/badge/Express-4.x-000000?logo=express&logoColor=white)
-![SQLite](https://img.shields.io/badge/SQLite-node%3Asqlite-003B57?logo=sqlite&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-41%20passed-10b981)
-![License](https://img.shields.io/badge/license-MIT-blue)
-
-A role-gated financial records and analytics backend with a built-in dashboard UI. Built with Node.js, Express, and SQLite — zero infrastructure required, runs with a single command.
-
----
-
 ## Table of Contents
 
 - [Overview](#overview)
@@ -17,11 +5,8 @@ A role-gated financial records and analytics backend with a built-in dashboard U
 - [Tech Stack](#tech-stack)
 - [Architecture](#architecture)
 - [Project Structure](#project-structure)
-- [Getting Started](#getting-started)
 - [Role Model and Access Control](#role-model-and-access-control)
 - [API Reference](#api-reference)
-- [Design Decisions](#design-decisions)
-- [Assumptions and Tradeoffs](#assumptions-and-tradeoffs)
 
 ---
 
@@ -169,75 +154,6 @@ finledger-api/
 
 ---
 
-## Getting Started
-
-### Prerequisites
-
-**Node.js 22 or newer** — the project uses the built-in `node:sqlite` module introduced in Node 22.
-
-```bash
-node --version   # must be v22.x or higher
-```
-
-### Installation
-
-```bash
-git clone https://github.com/your-username/finledger-api.git
-cd finledger-api
-npm install
-```
-
-### Environment setup
-
-```bash
-cp .env.example .env
-```
-
-Open `.env` and set `JWT_SECRET`. The server will refuse to start without it:
-
-```env
-JWT_SECRET=any-long-random-string-you-choose
-JWT_EXPIRES_IN=24h
-PORT=3000
-DB_PATH=./data/finledger.db
-```
-
-### Seed the database
-
-```bash
-npm run seed
-```
-
-Creates three demo users and 60 randomised transactions spanning the last 12 months:
-
-| Role | Email | Password |
-|---|---|---|
-| Admin | admin@finledger.dev | Admin1234 |
-| Analyst | analyst@finledger.dev | Analyst1234 |
-| Viewer | viewer@finledger.dev | Viewer1234 |
-
-### Run tests
-
-```bash
-npm test
-```
-
-Uses an isolated in-memory database — no files created or modified. Expected: **41 passed, 0 failed**.
-
-### Start the server
-
-```bash
-npm start
-```
-
-| URL | What |
-|---|---|
-| `http://localhost:3000/` | Dashboard UI |
-| `http://localhost:3000/api/...` | REST API |
-| `http://localhost:3000/health` | Health check |
-
----
-
 ## Role Model and Access Control
 
 Three roles in a strict hierarchy:
@@ -374,52 +290,3 @@ Accessible to **all authenticated users**.
 | Method | Endpoint | Access | Description |
 |---|---|---|---|
 | `GET` | `/health` | Public | Server status and timestamp |
-
----
-
-## Design Decisions
-
-**Why separate `app.js` from `server.js`?**  
-`app.js` exports the Express app without binding to a port. Tests import it directly via Supertest and run against an in-memory database without opening any sockets. This is the standard Express testability pattern.
-
-**Why re-query the user on every request instead of trusting the JWT?**  
-If an admin deactivates an account, the change takes effect on the very next request — not when the token expires. The cost is one primary-key lookup per request, which is negligible against any real workload.
-
-**Why soft deletes for transactions?**  
-Financial records should never be silently destroyed. `is_deleted = 1` makes the record invisible to all queries while preserving the full audit trail. Hard deletion would require direct database access.
-
-**Why a centralized error handler?**  
-Every `AppError` propagates to `middleware/errorHandler.js` via `next(err)`. Every error response has the same shape. Adding a new error type is a one-line change in one file. Controllers contain zero `try/catch` blocks.
-
-**Why validate at the route level, not in services?**  
-Input validation (field format, enum membership) belongs to the HTTP interface, not the domain. Services receive clean data. If the API were ever called from a CLI or queue instead of HTTP, the service layer would remain valid unchanged.
-
-**Why a custom `_sqliteWeekNumber` helper instead of using `Date` directly?**  
-SQLite's `strftime('%W')` is Monday-based (week 01 = first Monday of the year). JavaScript's `getDay()` is Sunday-based. Using `getDay()` directly produces keys that differ from SQLite's output on Saturdays, Sundays, and year boundaries — the gap-fill lookup would silently produce zero-entries for weeks that actually contain data. The helper replicates `%W` exactly and was verified against SQLite's output across 18 boundary dates before use.
-
----
-
-## Assumptions and Tradeoffs
-
-### Assumptions
-
-1. **Registration always produces viewer accounts.** Accepting a `role` field at registration is a privilege-escalation vulnerability. The validator blocks it and the service hardcodes `'viewer'`. Elevated roles are granted only by admins via `PATCH /api/users/:id`.
-
-2. **Category enum is fixed.** 15 predefined categories make validation deterministic and keep aggregation queries clean. Dynamic categories could be added via an admin API later.
-
-3. **Amounts are always positive.** Transaction direction is expressed by `type`, not by sign. This keeps aggregation queries readable.
-
-4. **Soft delete only.** No hard-delete endpoint. Permanent removal requires direct DB access — intentional for audit purposes.
-
-5. **No token invalidation on logout.** Tokens expire naturally. In production a Redis-backed blocklist handles immediate revocation. Out of scope here.
-
-### Tradeoffs
-
-| Decision | Gained | Deferred |
-|---|---|---|
-| SQLite over PostgreSQL | Zero infrastructure, instant setup | No connection pooling, single-writer |
-| JWT over sessions | Stateless, trivially testable | No instant revocation without a blocklist |
-| Synchronous SQLite driver | No async/await in models | Blocks event loop under heavy concurrent writes |
-| Fixed category enum | Deterministic validation, clean aggregation | Less flexible for novel use cases |
-| No dashboard caching | Always-fresh data, simpler code | Aggregations re-run on every request |
-| Soft delete only | Full audit trail | DB grows without a purge mechanism |
