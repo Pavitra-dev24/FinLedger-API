@@ -43,11 +43,6 @@ Different users interact with the system based on their role. A **viewer** sees 
 - User management with one-click activate / deactivate (admin only)
 - SPA routing — direct browser navigation to `/dashboard`, `/transactions` etc. works correctly
 
-**Testing**
-- 41 integration tests across 3 suites
-- Isolated in-memory SQLite database per test run
-- Covers: auth flows, RBAC enforcement per role, full CRUD lifecycle, validation rejection, soft-delete visibility, pagination, trend gap-filling, and edge cases
-
 ---
 
 ## Tech Stack
@@ -57,11 +52,10 @@ Different users interact with the system based on their role. A **viewer** sees 
 | Runtime | Node.js 22 | Built-in `node:sqlite` — no native compilation |
 | Framework | Express 4 | Minimal, composable, widely understood |
 | Database | SQLite via `node:sqlite` | Zero setup, full SQL, file-based |
-| Auth | JWT + `jsonwebtoken` | Stateless, easy to test |
+| Auth | JWT + `jsonwebtoken` | Stateless token-based auth |
 | Password hashing | `bcryptjs` | Pure JS — no native bindings |
 | Validation | `express-validator` | Declarative rules per route |
 | Security | `helmet` + `express-rate-limit` | HTTP headers + abuse protection |
-| Testing | Jest + Supertest | HTTP-level integration tests |
 | Frontend | Vanilla HTML/CSS/JS | No build tooling, single file |
 
 ---
@@ -138,17 +132,11 @@ finledger-api/
 │   │   └── transaction.validator.js
 │   ├── utils/
 │   │   └── errors.js            # AppError class + asyncHandler wrapper
-│   ├── app.js                   # Express app wired up (no listen — testable)
+│   ├── app.js                   # Express app wired up (no listen call)
 │   └── server.js                # Entry point: listen, startup guard, graceful shutdown
 ├── scripts/
 │   └── seed.js                  # Creates 3 demo users + 60 transactions
-├── tests/
-│   ├── helpers.js               # In-memory DB + createUserAndLogin() util
-│   ├── auth.test.js             # 12 tests
-│   ├── transactions.test.js     # 17 tests
-│   └── dashboard_users.test.js  # 12 tests
 ├── .env.example
-├── jest.config.js
 └── package.json
 ```
 
